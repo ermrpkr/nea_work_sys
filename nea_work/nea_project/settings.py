@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ── Security ──────────────────────────────────────────────────────────────────
 SECRET_KEY = config('SECRET_KEY', default='nea-loss-system-secret-key-change-in-production-xyz123abc')
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*', cast=Csv())
 
 # ── Apps ──────────────────────────────────────────────────────────────────────
@@ -22,6 +22,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',   # serves static files on Railway
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -52,11 +53,25 @@ TEMPLATES = [
 WSGI_APPLICATION = 'nea_project.wsgi.application'
 
 # ── Database ──────────────────────────────────────────────────────────────────
-# Controlled by .env file.  DB_ENGINE defaults to PostgreSQL.
-# Set DB_ENGINE=django.db.backends.sqlite3 in .env to fall back to SQLite.
-DB_ENGINE = config('DB_ENGINE', default='django.db.backends.postgresql')
+# Railway automatically provides DATABASE_URL environment variable.
+# If DATABASE_URL is set, use it directly.  Otherwise fall back to individual vars.
+DATABASE_URL = config('DATABASE_URL', default=None)
 
-if DB_ENGINE == 'django.db.backends.sqlite3':
+if DATABASE_URL:
+    # Parse Railway's DATABASE_URL (postgres://user:pass@host:port/dbname)
+    import urllib.parse as urlparse
+    url = urlparse.urlparse(DATABASE_URL)
+    DATABASES = {
+        'default': {
+            'ENGINE':   'django.db.backends.postgresql',
+            'NAME':     url.path.lstrip('/'),
+            'USER':     url.username,
+            'PASSWORD': url.password,
+            'HOST':     url.hostname,
+            'PORT':     str(url.port or 5432),
+        }
+    }
+elif config('DB_ENGINE', default='postgresql') == 'sqlite3':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -85,10 +100,12 @@ TIME_ZONE = 'Asia/Kathmandu'
 USE_I18N = True
 USE_TZ = True
 
-# ── Static & Media ────────────────────────────────────────────────────────────
+# ── Static files (WhiteNoise serves them on Railway) ─────────────────────────
 STATIC_URL = '/static/'
 STATICFILES_DIRS = []
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
