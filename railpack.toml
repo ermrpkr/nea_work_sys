@@ -1,0 +1,15 @@
+[provider]
+name = "python"
+version = "3.12"
+
+[build]
+rootDir = "nea_work"
+
+[build.install]
+cmd = "pip install -r requirements.txt"
+
+[build.build]
+cmd = "python manage.py collectstatic --noinput"
+
+[deploy]
+cmd = "gunicorn nea_project.wsgi --workers 2 --threads 2 --bind 0.0.0.0:$PORT"
